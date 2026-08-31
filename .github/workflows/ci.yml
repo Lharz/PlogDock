@@ -40,8 +40,8 @@ jobs:
           name: PlogDock
           path: PlogDock/bin/Release/PlogDock/
 
-  manifest:
-    name: Release manifest
+  submission:
+    name: D17 submission
     runs-on: ubuntu-latest
 
     steps:
@@ -51,14 +51,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Fails when the csproj version has no changelog section, or when that
-      # section is still empty. A version bumped without notes, or notes written
-      # without a bump, should not reach a release.
-      - name: Build manifest.toml
-        run: python .github/scripts/build_manifest.py | tee manifest.toml
+      # Fails when the csproj version has no changelog section, when that section
+      # is empty, when a newer section sits above it, or when the icon is not a
+      # square PNG between 64 and 512 pixels. None of those should reach a
+      # release, and all of them are cheaper to catch here than in review.
+      - name: Build submission
+        run: python .github/scripts/build_manifest.py --out submission
 
-      - name: Upload manifest.toml
+      # Uploaded from the staging directory so the archive is rooted at the
+      # channel: unzipping it over a clone of DalamudPluginsD17 drops the files
+      # exactly where they belong, with nothing to move by hand.
+      - name: Upload submission
         uses: actions/upload-artifact@v4
         with:
-          name: manifest
-          path: manifest.toml
+          name: submission
+          path: submission/

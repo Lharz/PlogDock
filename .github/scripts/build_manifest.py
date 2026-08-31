@@ -1,9 +1,13 @@
-"""Prints the manifest.toml to submit to DalamudPluginsD17 for the current commit.
+"""Builds the DalamudPluginsD17 submission for the current commit.
+
+Prints the manifest.toml, and with --out writes the whole submission tree so the
+artifact unzips straight onto a clone of DalamudPluginsD17.
 
 The version in the csproj is the single source of truth. The changelog section
-carrying that same version supplies the release notes, and its absence is an
-error rather than an empty field: a version bumped without notes, or notes
-written without a bump, is a mistake worth failing on.
+carrying that same version supplies the release notes, and that section must be
+the topmost one: the csproj version is the one being prepared, so notes sitting
+above it belong to a version the project has not been bumped to yet and would
+ship under the wrong number.
 
 Runs anywhere, not just in Actions. Locally it reads the commit from git; in
 Actions it takes the one being built.
@@ -11,8 +15,10 @@ Actions it takes the one being built.
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,10 +26,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CSPROJ = ROOT / "PlogDock" / "PlogDock.csproj"
 CHANGELOG = ROOT / "CHANGELOG.md"
+ICON = ROOT / "PlogDock" / "images" / "icon.png"
 
 OWNERS = ["Lharz"]
 PROJECT_PATH = "PlogDock"
 DEFAULT_REPOSITORY = "https://github.com/Lharz/PlogDock"
+
+# New plugins land in testing before being promoted. Override with D17_CHANNEL
+# once this one moves to stable.
+CHANNEL = os.environ.get("D17_CHANNEL", "testing/live")
+
+# D17 requires a square icon, no smaller than 64 and no larger than 512.
+ICON_MIN, ICON_MAX = 64, 512
 
 
 def fail(message: str) -> None:
@@ -43,10 +57,6 @@ def release_notes(version: str) -> str:
     """The changelog section for this version, without its heading."""
     text = CHANGELOG.read_text(encoding="utf-8")
 
-    # The csproj version is the one being prepared, so its section is necessarily
-    # the topmost. A newer section above it means someone wrote notes for a
-    # version the project has not been bumped to yet, which would silently ship
-    # under the wrong number.
     headings = re.findall(r"^##\s+(\d[\w.]*)\s*$", text, re.MULTILINE)
 
     if headings and headings[0] != version:
@@ -74,6 +84,34 @@ def release_notes(version: str) -> str:
         fail(f"the {version} section of {CHANGELOG.name} is empty.")
 
     return notes
+
+
+def icon_size(path: Path) -> tuple[int, int]:
+    """Width and height straight out of the PNG header.
+
+    Read by hand rather than with an imaging library: the dimensions live at a
+    fixed offset in the IHDR chunk, and this keeps the workflow free of a
+    dependency installed solely to measure one file.
+    """
+    data = path.read_bytes()
+
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        fail(f"{path.relative_to(ROOT)} is not a PNG file")
+
+    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+
+
+def check_icon() -> None:
+    if not ICON.is_file():
+        fail(f"{ICON.relative_to(ROOT)} is missing")
+
+    width, height = icon_size(ICON)
+
+    if width != height:
+        fail(f"the icon must be square, but it is {width}x{height}")
+
+    if not ICON_MIN <= width <= ICON_MAX:
+        fail(f"the icon must be between {ICON_MIN} and {ICON_MAX} pixels, but it is {width}x{height}")
 
 
 def commit() -> str:
@@ -115,34 +153,73 @@ def toml_multiline(value: str) -> str:
     return f'"""\n{escaped}"""'
 
 
-def main() -> None:
-    version = plugin_version()
-    notes = release_notes(version)
+def manifest_text(notes: str) -> str:
+    owners = ", ".join(f'"{owner}"' for owner in OWNERS)
 
-    manifest = "\n".join(
+    return "\n".join(
         [
             "[plugin]",
             f'repository = "{repository()}.git"',
             f'commit = "{commit()}"',
-            f"owners = [{', '.join(f'\"{o}\"' for o in OWNERS)}]",
+            f"owners = [{owners}]",
             f'project_path = "{PROJECT_PATH}"',
             f"changelog = {toml_multiline(notes)}",
             "",
         ]
     )
 
-    print(manifest, end="")
 
+def write_submission(out: Path, manifest: str) -> Path:
+    """Lays out the tree exactly as DalamudPluginsD17 expects it.
+
+    Rooted at the channel directory so the artifact can be unzipped over a clone
+    of the repository with nothing left to move by hand.
+    """
+    target = out / CHANNEL / PROJECT_PATH
+    (target / "images").mkdir(parents=True, exist_ok=True)
+
+    (target / "manifest.toml").write_text(manifest, encoding="utf-8")
+    shutil.copy2(ICON, target / "images" / "icon.png")
+
+    return target
+
+
+def write_summary(version: str, manifest: str) -> None:
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary:
         return
 
     with open(summary, "a", encoding="utf-8") as handle:
-        handle.write(f"## manifest.toml for {version}\n\n")
-        handle.write("Copy this into ")
-        handle.write(f"`testing/live/{PROJECT_PATH}/manifest.toml` ")
-        handle.write("in a DalamudPluginsD17 pull request.\n\n")
+        handle.write(f"## DalamudPluginsD17 submission for {version}\n\n")
+        handle.write(
+            "Download the `submission` artifact and unzip it over a clone of "
+            "DalamudPluginsD17. It already contains "
+            f"`{CHANNEL}/{PROJECT_PATH}/manifest.toml` and its icon.\n\n"
+        )
         handle.write(f"```toml\n{manifest}```\n")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        help="directory to write the submission tree into",
+    )
+    args = parser.parse_args()
+
+    version = plugin_version()
+    notes = release_notes(version)
+    check_icon()
+
+    manifest = manifest_text(notes)
+
+    if args.out:
+        target = write_submission(args.out, manifest)
+        print(f"wrote {target.relative_to(args.out)}/ under {args.out}", file=sys.stderr)
+
+    print(manifest, end="")
+    write_summary(version, manifest)
 
 
 if __name__ == "__main__":
