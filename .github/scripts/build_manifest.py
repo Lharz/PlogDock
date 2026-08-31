@@ -39,6 +39,9 @@ CHANNEL = os.environ.get("D17_CHANNEL", "testing/live")
 # D17 requires a square icon, no smaller than 64 and no larger than 512.
 ICON_MIN, ICON_MAX = 64, 512
 
+# Marks a section opened for a cycle in which nothing has landed yet.
+PLACEHOLDER = "_Nothing yet._"
+
 
 def fail(message: str) -> None:
     print(f"error: {message}", file=sys.stderr)
@@ -80,10 +83,11 @@ def release_notes(version: str) -> str:
 
     notes = match.group(1).strip()
 
-    if not notes or notes == "_Nothing yet._":
-        fail(f"the {version} section of {CHANGELOG.name} is empty.")
-
-    return notes
+    # An empty top section is the normal state of a cycle that has just begun,
+    # not a mistake: there is simply nothing to submit yet. Failing here would
+    # leave the workflow red on every push until the first change lands, which
+    # is the fastest way to teach everyone to ignore it.
+    return notes if notes and notes != PLACEHOLDER else ""
 
 
 def icon_size(path: Path) -> tuple[int, int]:
@@ -210,6 +214,21 @@ def main() -> None:
 
     version = plugin_version()
     notes = release_notes(version)
+
+    if not notes:
+        message = (
+            f"Nothing to submit: the {version} section of {CHANGELOG.name} is "
+            f"still empty. This is expected right after a release."
+        )
+        print(message, file=sys.stderr)
+
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as handle:
+                handle.write(f"## No submission for {version}\n\n{message}\n")
+
+        return
+
     check_icon()
 
     manifest = manifest_text(notes)

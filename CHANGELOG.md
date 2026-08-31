@@ -12,8 +12,13 @@ cycle. Bumping first would publish the release under the following version's
 number.
 
 The workflow enforces both halves of that: it refuses to produce a manifest when
-the csproj version has no section, when that section is empty, or when the
-topmost section is not the csproj version.
+the csproj version has no section, or when the topmost section is not the csproj
+version. An empty topmost section is not an error, it is how a cycle starts, and
+the workflow simply reports that there is nothing to submit yet.
+
+A new cycle opens at a patch bump. The number is provisional until a release
+pins it, so it is raised to a minor or a major the moment the work landing here
+justifies it.
 
 Versions are `major.minor.patch.build`. The fourth component is unused and stays
 at zero. Fixes only bump the patch, a new feature bumps the minor, and a change
