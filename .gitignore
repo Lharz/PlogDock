@@ -11,8 +11,9 @@ artifacts/
 .idea/
 __pycache__/
 
-# Design docs, icon explorations and generation scripts: working material,
-# not part of the plugin.
+# Design docs, icon explorations, generation scripts and the working notes for
+# AI sessions: material for developing the plugin, not part of it.
+CLAUDE.md
 docs/superpowers/
 assets/icon-concepts/
 tools/
