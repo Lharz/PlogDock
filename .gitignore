@@ -1,0 +1,18 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userprefs
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+*.dll.config
+.idea/
+__pycache__/
+
+# Design docs, icon explorations and generation scripts: working material,
+# not part of the plugin.
+docs/superpowers/
+assets/icon-concepts/
+tools/
