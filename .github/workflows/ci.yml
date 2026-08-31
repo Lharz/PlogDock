@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+
+      # Plogon builds against Dalamud itself, so the same libraries are fetched
+      # here rather than assuming a game install. DALAMUD_HOME is what the SDK
+      # looks at, and setting it is also what switches the project off its local
+      # devPlugins output path.
+      - name: Fetch Dalamud
+        shell: pwsh
+        run: |
+          $home_dir = Join-Path $env:RUNNER_TEMP "dalamud"
+          New-Item -ItemType Directory -Force $home_dir | Out-Null
+          Invoke-WebRequest -Uri "https://goatcorp.github.io/dalamud-distrib/latest.zip" -OutFile "$home_dir.zip"
+          Expand-Archive -Path "$home_dir.zip" -DestinationPath $home_dir -Force
+          "DALAMUD_HOME=$home_dir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build
+        run: dotnet build PlogDock/PlogDock.csproj -c Release --nologo
+
+      - name: Upload packaged plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlogDock
+          path: PlogDock/bin/Release/PlogDock/
+
+  manifest:
+    name: Release manifest
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Fails when the csproj version has no changelog section, or when that
+      # section is still empty. A version bumped without notes, or notes written
+      # without a bump, should not reach a release.
+      - name: Build manifest.toml
+        run: python .github/scripts/build_manifest.py | tee manifest.toml
+
+      - name: Upload manifest.toml
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest
+          path: manifest.toml

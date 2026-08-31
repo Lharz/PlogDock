@@ -2,9 +2,9 @@
 version: "0.1.2"
 level: copilot
 components:
-  src/: copilot
-  images/icon.png: copilot
-  PlogDock.json: copilot
+  PlogDock/src/: copilot
+  PlogDock/images/icon.png: copilot
+  PlogDock/PlogDock.json: copilot
 ---
 
 ## Notes
@@ -27,7 +27,7 @@ the window grew, and the bar drawing over the title screen. Coverage numbers in
 the design were measured on a live install of 104 plugins, not estimated.
 
 **What the AI produced.** The C# implementation, its comments, the design and
-planning documents, and the placeholder icon in `images/icon.png`, which is the
+planning documents, and the placeholder icon in `PlogDock/images/icon.png`, which is the
 output of a small Python script rather than an image model. The icon is
 provisional and expected to be replaced by hand-drawn artwork.
 

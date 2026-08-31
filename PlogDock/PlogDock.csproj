@@ -1,0 +1,19 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <Description>A shortcut bar for your installed plugins.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Local builds land straight in devPlugins so Dalamud hot-reloads them. A CI
+         build sets DALAMUD_HOME, and there this absolute path would drop the output
+         somewhere the packager never looks, so the default bin/ is left alone. -->
+    <OutputPath Condition="'$(DALAMUD_HOME)' == ''">$(AppData)\XIVLauncher\devPlugins\PlogDock\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="images\icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
