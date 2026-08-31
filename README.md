@@ -82,6 +82,14 @@ current commit, then bumping the version for the next cycle. CI builds the
 submission for you and refuses to produce one when the version and the changelog
 disagree.
 
+## Licence
+
+Copyright (C) 2026 Lharz.
+
+Released under the GNU Affero General Public License, version 3 or later. See
+[LICENSE](LICENSE). In short: use it, change it, share it, but a version you
+distribute has to carry its source under the same terms.
+
 ## AI usage
 
 Written with AI assistance, declared in [AI-DECLARATION.md](AI-DECLARATION.md)
