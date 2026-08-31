@@ -1,15 +1,23 @@
 # Changelog
 
-Each released version gets a section here, and the section heading must match
-`<Version>` in `PlogDock/PlogDock.csproj`. The release workflow reads the section
-matching that version and fails if it is missing, so the two can never drift.
+## How this works
 
-The topmost section is the one being worked on. It is filled in as changes land,
-and its version is bumped by hand at release time.
+`<Version>` in `PlogDock/PlogDock.csproj` is always **the version being prepared**,
+never the last one published. The topmost section here carries that same version
+and collects changes as they land.
 
-## 0.2.0.0
+Releasing is therefore: open the DalamudPluginsD17 pull request pinning the
+current commit, *then* bump `<Version>` and open a new section here for the next
+cycle. Bumping first would publish the release under the following version's
+number.
 
-_Nothing yet._
+The workflow enforces both halves of that: it refuses to produce a manifest when
+the csproj version has no section, when that section is empty, or when the
+topmost section is not the csproj version.
+
+Versions are `major.minor.patch.build`. The fourth component is unused and stays
+at zero. Fixes only bump the patch, a new feature bumps the minor, and a change
+that breaks how existing settings behave bumps the major.
 
 ## 0.1.0.0
 

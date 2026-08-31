@@ -43,6 +43,19 @@ def release_notes(version: str) -> str:
     """The changelog section for this version, without its heading."""
     text = CHANGELOG.read_text(encoding="utf-8")
 
+    # The csproj version is the one being prepared, so its section is necessarily
+    # the topmost. A newer section above it means someone wrote notes for a
+    # version the project has not been bumped to yet, which would silently ship
+    # under the wrong number.
+    headings = re.findall(r"^##\s+(\d[\w.]*)\s*$", text, re.MULTILINE)
+
+    if headings and headings[0] != version:
+        fail(
+            f"the topmost section of {CHANGELOG.name} is {headings[0]}, but "
+            f"<Version> is {version}. The version being prepared must be the "
+            f"first section; bump the csproj or move the section down."
+        )
+
     # Headings are matched anchored to a line start so a version mentioned inside
     # a bullet cannot be taken for a section of its own.
     pattern = rf"^##\s+{re.escape(version)}\s*$(.*?)(?=^##\s|\Z)"
