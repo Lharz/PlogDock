@@ -24,6 +24,10 @@ Versions are `major.minor.patch.build`. The fourth component is unused and stays
 at zero. Fixes only bump the patch, a new feature bumps the minor, and a change
 that breaks how existing settings behave bumps the major.
 
+## 0.1.1.0
+
+_Nothing yet._
+
 ## 0.1.0.0
 
 - Initial release.
