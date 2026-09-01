@@ -24,7 +24,14 @@ Versions are `major.minor.patch.build`. The fourth component is unused and stays
 at zero. Fixes only bump the patch, a new feature bumps the minor, and a change
 that breaks how existing settings behave bumps the major.
 
+Inside a section, entries are grouped under `### Added`, `### Changed` and
+`### Fixed`, in that order, and only the groups that have something in them are
+written. The heading level is load-bearing: the manifest builder ends a version
+at the next `## ` heading, and `###` is deliberately not one.
+
 ## 0.2.0.0
+
+### Added
 
 - Shortcuts can be marked as favourites. The favourites are drawn as their own
   block at the top of the panel, above a rule and ahead of everything else, so the
@@ -33,16 +40,10 @@ that breaks how existing settings behave bumps the major.
   arranged there is the order the panel shows. A shortcut is starred from the
   button at the end of its row, or dragged across the rule. Nothing starts
   favourited, so a bar left alone looks exactly as it did.
-- The two reorder buttons in the settings list are drawn as arrows. A caret and a
-  lowercase v read as punctuation rather than as something to click.
 - Every row in the settings list carries its plugin's icon, the same artwork the
   bar draws and the same initials tile behind it when there is none to be had. A
   list of forty entries is picked through by shape long before it is read by
   name.
-- A plugin disabled or uninstalled in Dalamud no longer appears in the bar, nor in
-  the settings list. Its tile answered no click, and its row was greyed out to the
-  point that it could not even be unticked. The shortcut is kept, so enabling the
-  plugin again brings it back where it was.
 - New setting, *Enable new plugins automatically*, off by default. Turned on, a
   plugin installed while PlogDock is running gets its shortcut straight away
   rather than waiting to be ticked in the settings. It is still flagged as new
@@ -53,6 +54,18 @@ that breaks how existing settings behave bumps the major.
   showing. *Enable all* skips the plugins PlogDock has no way of opening, the
   ones whose checkbox is greyed out. *Sort A-Z* replaces the manual order and
   cannot be undone.
+
+### Changed
+
+- The two reorder buttons in the settings list are drawn as arrows. A caret and a
+  lowercase v read as punctuation rather than as something to click.
+
+### Fixed
+
+- A plugin disabled or uninstalled in Dalamud no longer appears in the bar, nor in
+  the settings list. Its tile answered no click, and its row was greyed out to the
+  point that it could not even be unticked. The shortcut is kept, so enabling the
+  plugin again brings it back where it was.
 - The settings window can no longer be resized below the point where its own
   controls stop fitting. It still opens at its usual size and still remembers
   whatever size it is given afterwards, it simply has a floor now.
