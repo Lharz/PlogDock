@@ -13,6 +13,7 @@ internal sealed class ConfigWindow : Window
     private readonly Configuration config;
     private readonly PluginCatalog catalog;
     private readonly Launcher launcher;
+    private readonly IconService icons;
 
     /// <summary>The rows to draw this frame, gathered section by section and each
     /// paired with its index in the configuration. Refilled every frame, kept as a
@@ -60,12 +61,13 @@ internal sealed class ConfigWindow : Window
 
     private const string ConfirmPopup = "Confirm##PlogDockConfirmBulk";
 
-    public ConfigWindow(Configuration config, PluginCatalog catalog, Launcher launcher)
+    public ConfigWindow(Configuration config, PluginCatalog catalog, Launcher launcher, IconService icons)
         : base("PlogDock settings##PlogDockConfig")
     {
         this.config = config;
         this.catalog = catalog;
         this.launcher = launcher;
+        this.icons = icons;
 
         this.Size = new Vector2(520f, 640f);
         this.SizeCondition = ImGuiCond.FirstUseEver;
@@ -361,11 +363,17 @@ internal sealed class ConfigWindow : Window
             ImGui.BeginDisabled();
 
         var enabled = shortcut.Enabled;
-        if (ImGui.Checkbox(entry.DisplayName, ref enabled))
+        if (ImGui.Checkbox("##enabled", ref enabled))
         {
             shortcut.Enabled = enabled;
             this.config.Save();
         }
+
+        ImGui.SameLine();
+        this.DrawRowIcon(entry);
+        ImGui.SameLine();
+
+        this.DrawRowLabel(shortcut, entry.DisplayName);
 
         if (!actionable)
             ImGui.EndDisabled();
@@ -395,6 +403,55 @@ internal sealed class ConfigWindow : Window
         // and starring it on the spot is exactly what the search box is for.
         ImGui.SameLine(ImGui.GetContentRegionMax().X - this.trailingWidth);
         this.DrawRowControls(position, index, shortcut, filtering, first, last);
+    }
+
+    /// <summary>
+    /// The plugin's own icon, between the tick and the name, the same artwork the bar
+    /// draws and with the same initials tile standing in while a download is pending or
+    /// has failed. Sized to the row rather than to
+    /// <see cref="Configuration.IconSize"/>: this is a list, and a bar set to sixty
+    /// four pixel tiles would otherwise give it sixty four pixel lines.
+    /// </summary>
+    private void DrawRowIcon(CatalogEntry entry)
+    {
+        var size = ImGui.GetFrameHeight();
+
+        if (this.icons.TryGet(entry) is { } texture)
+        {
+            ImGui.Image(texture.Handle, new Vector2(size, size));
+        }
+        else
+        {
+            // Draw leaves the cursor where it found it, so the row needs an item of its
+            // own to step over the tile.
+            InitialsIcon.Draw(entry.InternalName, entry.DisplayName, size);
+            ImGui.Dummy(new Vector2(size, size));
+        }
+    }
+
+    /// <summary>
+    /// The plugin's name, an item of its own now that the icon has come between it and
+    /// the tick. Clicking it still ticks the shortcut, as it did while it was the
+    /// checkbox's own label, and it is still what a row is dragged by: the box on its
+    /// own is a twenty pixel square, which is not something to aim a drag at.
+    /// <para>
+    /// Sized to its text rather than left to fill the line, or it would run under the
+    /// buttons at the end of the row and take the hover from them. The offset is the
+    /// padding a checkbox leaves above its own label, and puts the name back on the
+    /// line the tick reads on.
+    /// </para>
+    /// </summary>
+    private void DrawRowLabel(ShortcutEntry shortcut, string displayName)
+    {
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() + ImGui.GetStyle().FramePadding.Y);
+
+        var width = new Vector2(ImGui.CalcTextSize(displayName).X, 0f);
+
+        if (!ImGui.Selectable(displayName, false, ImGuiSelectableFlags.None, width))
+            return;
+
+        shortcut.Enabled = !shortcut.Enabled;
+        this.config.Save();
     }
 
     /// <summary>

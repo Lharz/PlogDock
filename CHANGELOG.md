@@ -35,6 +35,10 @@ that breaks how existing settings behave bumps the major.
   favourited, so a bar left alone looks exactly as it did.
 - The two reorder buttons in the settings list are drawn as arrows. A caret and a
   lowercase v read as punctuation rather than as something to click.
+- Every row in the settings list carries its plugin's icon, the same artwork the
+  bar draws and the same initials tile behind it when there is none to be had. A
+  list of forty entries is picked through by shape long before it is read by
+  name.
 - A plugin disabled or uninstalled in Dalamud no longer appears in the bar, nor in
   the settings list. Its tile answered no click, and its row was greyed out to the
   point that it could not even be unticked. The shortcut is kept, so enabling the

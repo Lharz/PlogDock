@@ -38,7 +38,7 @@ public sealed class Plugin : IDalamudPlugin
         this.icons = new IconService();
 
         // Built before the bar so the bar can be handed a way to open it.
-        this.configWindow = new ConfigWindow(this.config, this.catalog, this.launcher);
+        this.configWindow = new ConfigWindow(this.config, this.catalog, this.launcher, this.icons);
         this.windowSystem.AddWindow(this.configWindow);
 
         this.barWindow = new BarWindow(this.config, this.catalog, this.launcher, this.icons, this.ShowConfig);

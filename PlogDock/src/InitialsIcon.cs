@@ -59,7 +59,13 @@ internal static class InitialsIcon
         var origin = ImGui.GetCursorScreenPos();
         var corner = new Vector2(origin.X + size, origin.Y + size);
 
-        drawList.AddRectFilled(origin, corner, Color(internalName), size * 0.18f);
+        // BeginDisabled dims a widget by lowering the global alpha, which ImGui folds
+        // into everything it draws itself and cannot fold into this: the tile goes
+        // straight to the draw list. Applying it by hand is what keeps a greyed out row
+        // greyed out whether its plugin has artwork or only two letters.
+        var alpha = ImGui.GetStyle().Alpha;
+
+        drawList.AddRectFilled(origin, corner, Fade(Color(internalName), alpha), size * 0.18f);
 
         var text = Initials(displayName);
         var textSize = ImGui.CalcTextSize(text);
@@ -67,7 +73,19 @@ internal static class InitialsIcon
             origin.X + ((size - textSize.X) / 2f),
             origin.Y + ((size - textSize.Y) / 2f));
 
-        drawList.AddText(textPos, 0xFFFFFFFFu, text);
+        drawList.AddText(textPos, Fade(0xFFFFFFFFu, alpha), text);
+    }
+
+    /// <summary>Scales the alpha of a packed colour, which ImGui keeps in the high
+    /// byte.</summary>
+    private static uint Fade(uint colour, float alpha)
+    {
+        if (alpha >= 1f)
+            return colour;
+
+        var faded = (uint)(((colour >> 24) & 0xFFu) * Math.Clamp(alpha, 0f, 1f));
+
+        return (colour & 0x00FFFFFFu) | (faded << 24);
     }
 
     private static (float R, float G, float B) HsvToRgb(float h, float s, float v)
