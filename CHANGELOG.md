@@ -40,6 +40,9 @@ that breaks how existing settings behave bumps the major.
   showing. *Enable all* skips the plugins PlogDock has no way of opening, the
   ones whose checkbox is greyed out. *Sort A-Z* replaces the manual order and
   cannot be undone.
+- The settings window can no longer be resized below the point where its own
+  controls stop fitting. It still opens at its usual size and still remembers
+  whatever size it is given afterwards, it simply has a floor now.
 
 ## 0.1.0.0
 

@@ -54,6 +54,15 @@ internal sealed class ConfigWindow : Window
 
         this.Size = new Vector2(520f, 640f);
         this.SizeCondition = ImGuiCond.FirstUseEver;
+
+        // FirstUseEver hands the size over to dalamudUI.ini from the second session
+        // on, and nothing there has a floor: a window dragged small once stays small
+        // forever, across reinstalls. The constraint is what keeps it openable.
+        this.SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(360f, 400f),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
+        };
     }
 
     /// <summary>Clears the new-plugin flags: the list has been seen.</summary>
