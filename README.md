@@ -33,8 +33,9 @@ you choose the geometry rather than decode a name for it. Column count, icon
 size and whether the dock is pinned in place are all adjustable.
 
 On a first run every plugin PlogDock can open starts enabled, so the dock is
-useful immediately. A plugin installed later always arrives disabled and flagged
-as new: the dock never grows on its own.
+useful immediately. A plugin installed later arrives disabled and flagged as new:
+the dock never grows on its own. Tick *Enable new plugins automatically* if you
+would rather it did.
 
 Note that a handful of plugins expose a command that performs an action rather
 than opening a window — Lifestream's `/li` sends your character home, for

@@ -24,9 +24,12 @@ Versions are `major.minor.patch.build`. The fourth component is unused and stays
 at zero. Fixes only bump the patch, a new feature bumps the minor, and a change
 that breaks how existing settings behave bumps the major.
 
-## 0.1.1.0
+## 0.2.0.0
 
-_Nothing yet._
+- New setting, *Enable new plugins automatically*, off by default. Turned on, a
+  plugin installed while PlogDock is running gets its shortcut straight away
+  rather than waiting to be ticked in the settings. It is still flagged as new
+  either way, so it can be found among a hundred others.
 
 ## 0.1.0.0
 

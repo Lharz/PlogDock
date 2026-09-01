@@ -91,6 +91,16 @@ internal sealed class ConfigWindow : Window
             this.config.Save();
         }
 
+        var autoEnable = this.config.AutoEnableNewPlugins;
+        if (ImGui.Checkbox("Enable new plugins automatically", ref autoEnable))
+        {
+            this.config.AutoEnableNewPlugins = autoEnable;
+            this.config.Save();
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("A plugin installed from now on gets its shortcut without being ticked here first.");
+
         this.DrawPlacementPicker();
     }
 

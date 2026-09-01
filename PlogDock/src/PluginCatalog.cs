@@ -88,7 +88,8 @@ internal sealed class PluginCatalog
     /// Creates a shortcut entry for every plugin not seen before. On a first launch
     /// everything PlogDock can open starts enabled, whether through a main UI or
     /// through a command, so the bar is useful without any setup. Afterwards a newly
-    /// installed plugin always arrives disabled: the bar must never grow on its own.
+    /// installed plugin arrives disabled — the bar must never grow on its own — unless
+    /// <see cref="Configuration.AutoEnableNewPlugins"/> has been turned on.
     /// <para>
     /// A handful of commands act rather than open a window, and one of them sends the
     /// character home. Nothing in the API separates those from the rest, and hardcoding
@@ -120,7 +121,7 @@ internal sealed class PluginCatalog
             this.config.Entries.Add(new ShortcutEntry
             {
                 InternalName = entry.InternalName,
-                Enabled = firstRun && this.CanBeOpened(entry),
+                Enabled = (firstRun || this.config.AutoEnableNewPlugins) && this.CanBeOpened(entry),
                 IsNew = !firstRun,
             });
 

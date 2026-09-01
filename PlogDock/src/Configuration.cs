@@ -52,12 +52,19 @@ internal sealed class Configuration : IPluginConfiguration
     /// <summary>Whether the bar is unfolded. Restored across sessions.</summary>
     public bool Expanded { get; set; }
 
+    /// <summary>Whether a plugin installed after the first run arrives enabled.
+    /// Off by default: a bar that grows on its own is a surprise, and the new-plugin
+    /// flag already surfaces the arrival. On, for anyone who would rather have a
+    /// shortcut to whatever they just installed without asking for it.</summary>
+    public bool AutoEnableNewPlugins { get; set; }
+
     /// <summary>The order of this list is the order of the grid.</summary>
     public List<ShortcutEntry> Entries { get; set; } = new();
 
-    /// <summary>True until the initial reconciliation has run. Tells a first
-    /// launch, where plugins exposing a main UI are pre-enabled, apart from a
-    /// later install, where a new plugin arrives disabled.</summary>
+    /// <summary>True until the initial reconciliation has run. A first launch
+    /// discovers the whole catalog at once: it is pre-enabled whatever
+    /// <see cref="AutoEnableNewPlugins"/> says, and none of it is news. Every plugin
+    /// seen after that is a genuine arrival, and is flagged as one.</summary>
     public bool FirstRunPending { get; set; } = true;
 
     public static Configuration Load()
