@@ -65,6 +65,14 @@ internal sealed class PluginCatalog
         }
     }
 
+    /// <summary>The same, narrowed to one section.</summary>
+    public IEnumerable<(ShortcutEntry Shortcut, CatalogEntry Catalog)> OrderedShortcuts(string section)
+        => this.OrderedShortcuts().Where(pair => ShortcutSections.Of(pair.Shortcut) == section);
+
+    /// <summary>How many shortcuts a section will draw. Wanted before any of them is
+    /// drawn, to size the rule that separates one section from the next.</summary>
+    public int CountShortcuts(string section) => this.OrderedShortcuts(section).Count();
+
     public void Refresh()
     {
         var fresh = new Dictionary<string, CatalogEntry>(StringComparer.Ordinal);

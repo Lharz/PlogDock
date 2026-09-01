@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Windowing;
 
 namespace PlogDock.UI;
@@ -13,16 +14,30 @@ internal sealed class ConfigWindow : Window
     private readonly PluginCatalog catalog;
     private readonly Launcher launcher;
 
-    /// <summary>The rows to draw this frame, each paired with its index in the
-    /// configuration. Refilled every frame, kept as a field so a hundred plugins do
-    /// not allocate a list per frame for as long as the window stays open.</summary>
-    private readonly List<(int Index, CatalogEntry Entry)> listed = [];
+    /// <summary>The rows to draw this frame, gathered section by section and each
+    /// paired with its index in the configuration. Refilled every frame, kept as a
+    /// field so a hundred plugins do not allocate a list per frame for as long as the
+    /// window stays open.</summary>
+    private readonly List<(int Index, CatalogEntry Entry, string Section)> listed = [];
+
+    /// <summary>How many rows each section contributed to <see cref="listed"/>. Known
+    /// before the rows are drawn, so a section with none can still show its heading
+    /// and offer somewhere to drop a row.</summary>
+    private readonly Dictionary<string, int> sectionCounts = new(StringComparer.Ordinal);
 
     private string search = string.Empty;
 
+    /// <summary>Room to leave at the end of a row for the buttons sitting there.
+    /// Measured once a frame rather than per row: the star is drawn in the icon font,
+    /// and pushing a font to measure one glyph a hundred times over is work for
+    /// an answer that does not change between two rows.</summary>
+    private float trailingWidth;
+
     /// <summary>A reorder requested this frame, applied once the list is drawn.
-    /// Moving an entry mid-iteration would displace one the loop has yet to reach.</summary>
-    private (int From, int To)? pendingMove;
+    /// Moving an entry mid-iteration would displace one the loop has yet to reach.
+    /// The section is the one the row landed in: dragging across the rule is how a
+    /// shortcut changes section, and a drop that only changes section moves nothing.</summary>
+    private (int From, int To, string Section)? pendingMove;
 
     /// <summary>Index being dragged. ImGui payloads carry raw bytes, and a field is
     /// both simpler and safer than marshalling an int through one, so the payload
@@ -96,6 +111,8 @@ internal sealed class ConfigWindow : Window
             return;
 
         var entry = this.config.Entries[move.From];
+        ShortcutSections.Assign(entry, move.Section);
+
         this.config.Entries.RemoveAt(move.From);
         this.config.Entries.Insert(Math.Clamp(move.To, 0, this.config.Entries.Count), entry);
 
@@ -203,15 +220,37 @@ internal sealed class ConfigWindow : Window
     /// greyed out — its checkbox could not be reached and its tile could not be
     /// clicked, so listing it only raises the question of why. The shortcut stays in
     /// the configuration and comes back, in place, when the plugin does.
+    /// <para>
+    /// Gathered section by section, in the order the panel draws them. Cutting the list
+    /// up here as well is what keeps the two views telling one story: an order arranged
+    /// flat in this window and then redrawn in blocks in the panel is the confusing
+    /// half of the feature.
+    /// </para>
     /// </summary>
     private void CollectListed()
     {
         this.listed.Clear();
+        this.sectionCounts.Clear();
 
-        for (var i = 0; i < this.config.Entries.Count; i++)
+        foreach (var section in ShortcutSections.Order)
         {
-            if (this.catalog.FindAvailable(this.config.Entries[i].InternalName) is { } entry)
-                this.listed.Add((i, entry));
+            var count = 0;
+
+            for (var i = 0; i < this.config.Entries.Count; i++)
+            {
+                var shortcut = this.config.Entries[i];
+
+                if (ShortcutSections.Of(shortcut) != section)
+                    continue;
+
+                if (this.catalog.FindAvailable(shortcut.InternalName) is not { } entry)
+                    continue;
+
+                this.listed.Add((i, entry, section));
+                count++;
+            }
+
+            this.sectionCounts[section] = count;
         }
     }
 
@@ -228,6 +267,7 @@ internal sealed class ConfigWindow : Window
         ImGui.InputTextWithHint("##search", "Search...", ref this.search, 128);
 
         var filtering = this.search.Length > 0;
+        this.trailingWidth = TrailingWidth(filtering);
 
         if (filtering)
             ImGui.TextDisabled("Reordering is hidden while searching.");
@@ -238,33 +278,80 @@ internal sealed class ConfigWindow : Window
             return;
         }
 
-        for (var position = 0; position < this.listed.Count; position++)
+        var position = 0;
+
+        foreach (var section in ShortcutSections.Order)
         {
-            var (index, entry) = this.listed[position];
-            var shortcut = this.config.Entries[index];
+            var count = this.sectionCounts[section];
 
-            if (filtering && entry.DisplayName.IndexOf(this.search, StringComparison.OrdinalIgnoreCase) < 0)
-                continue;
+            ImGui.TextDisabled(section);
+            ImGui.Separator();
 
-            ImGui.PushID(shortcut.InternalName);
-            this.DrawShortcutRow(position, index, shortcut, entry, filtering);
-            ImGui.PopID();
+            // The increment sits in the loop header so that a row skipped by the
+            // search still advances the position it stands for in the list.
+            for (var row = 0; row < count; row++, position++)
+            {
+                var (index, entry, _) = this.listed[position];
+                var shortcut = this.config.Entries[index];
+
+                if (filtering && entry.DisplayName.IndexOf(this.search, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                ImGui.PushID(shortcut.InternalName);
+                this.DrawShortcutRow(position, index, shortcut, entry, filtering, row == 0, row == count - 1);
+                ImGui.PopID();
+            }
+
+            // A section with no rows still needs somewhere to drop one, or emptying
+            // the favourites would leave the star as the only way back in.
+            if (count == 0 && !filtering)
+                this.DrawEmptySection(section);
+
+            ImGui.Spacing();
         }
 
         ImGui.EndChild();
+    }
+
+    /// <summary>
+    /// Stands in for a section holding no rows, and accepts a drop so one can be
+    /// dragged in. The drop changes the section without moving the entry: where it sits
+    /// in the configuration is what brings it back to the same place when it leaves the
+    /// section again.
+    /// </summary>
+    private void DrawEmptySection(string section)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.TextDisabled));
+        ImGui.Selectable($"Drop a plugin here.##empty-{section}");
+        ImGui.PopStyleColor();
+
+        if (!ImGui.BeginDragDropTarget())
+            return;
+
+        if (!ImGui.AcceptDragDropPayload("PLOGDOCK_ROW").IsNull && this.dragSource >= 0)
+        {
+            this.pendingMove = (this.dragSource, this.dragSource, section);
+            this.dragSource = -1;
+        }
+
+        ImGui.EndDragDropTarget();
     }
 
     /// <summary><paramref name="position"/> is the row in the list as drawn,
     /// <paramref name="index"/> the entry it stands for in the configuration. The two
     /// part company as soon as a plugin is left out, and both are needed: moving a row
     /// swaps it with its neighbour on screen, not with whatever entry happens to sit
-    /// next to it in the configuration.</summary>
+    /// next to it in the configuration. <paramref name="first"/> and
+    /// <paramref name="last"/> mark the ends of the section rather than of the list:
+    /// the notches never leave a section, the rule is crossed by dragging.</summary>
     private void DrawShortcutRow(
         int position,
         int index,
         ShortcutEntry shortcut,
         CatalogEntry entry,
-        bool filtering)
+        bool filtering,
+        bool first,
+        bool last)
     {
         // A plugin with nothing to open cannot be enabled: the checkbox would only
         // add a tile that does nothing when clicked.
@@ -284,7 +371,7 @@ internal sealed class ConfigWindow : Window
             ImGui.EndDisabled();
 
         if (!filtering)
-            this.HandleRowDragAndDrop(index, entry.DisplayName);
+            this.HandleRowDragAndDrop(index, entry.DisplayName, shortcut);
 
         if (shortcut.IsNew)
         {
@@ -298,20 +385,93 @@ internal sealed class ConfigWindow : Window
             ImGui.TextDisabled("(nothing to open)");
         }
 
+        // Measured from the content region rather than from what is left of the line,
+        // which the tags above shorten: the right hand controls have to land in the
+        // same column on every row, tagged or not. Their width is measured too, rather
+        // than guessed at a fixed number of pixels, because Dalamud's interface scale
+        // moves both the glyphs and the padding under them.
+        //
+        // The star stays reachable while searching. Finding one plugin among a hundred
+        // and starring it on the spot is exactly what the search box is for.
+        // The star stays reachable while searching. Finding one plugin among a hundred
+        // and starring it on the spot is exactly what the search box is for.
+        ImGui.SameLine(ImGui.GetContentRegionMax().X - this.trailingWidth);
+        this.DrawFavouriteToggle(shortcut);
+
         if (filtering)
             return;
 
+        var section = this.listed[position].Section;
+
         // Kept alongside the drag: one notch at a time is easier to aim than a drag,
         // and dragging across a hundred rows means scrolling while holding the mouse.
-        ImGui.SameLine(ImGui.GetContentRegionAvail().X - 34f);
+        // Neither notch leaves the section.
+        ImGui.SameLine();
 
-        if (ImGui.SmallButton("^") && position > 0)
-            this.pendingMove = (index, this.listed[position - 1].Index);
+        if (ImGui.SmallButton("^") && !first)
+            this.pendingMove = (index, this.listed[position - 1].Index, section);
 
         ImGui.SameLine();
 
-        if (ImGui.SmallButton("v") && position < this.listed.Count - 1)
-            this.pendingMove = (index, this.listed[position + 1].Index);
+        if (ImGui.SmallButton("v") && !last)
+            this.pendingMove = (index, this.listed[position + 1].Index, section);
+    }
+
+    /// <summary>How much room the buttons at the end of a row need. The notches are
+    /// gone while searching, leaving the star on its own.</summary>
+    private static float TrailingWidth(bool filtering)
+    {
+        var padding = ImGui.GetStyle().FramePadding.X * 2f;
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+
+        float star;
+        using (Service.PluginInterface.UiBuilder.IconFontHandle.Push())
+            star = ImGui.CalcTextSize(FontAwesomeIcon.Star.ToIconString()).X + padding;
+
+        if (filtering)
+            return star;
+
+        return star
+               + spacing + ImGui.CalcTextSize("^").X + padding
+               + spacing + ImGui.CalcTextSize("v").X + padding;
+    }
+
+    /// <summary>
+    /// The star. Available whether or not the shortcut is ticked: the list shows the
+    /// sections now, so starring something unticked visibly moves its row rather than
+    /// appearing to do nothing, and greying the button out would only forbid what a
+    /// drag across the rule can still do.
+    /// <para>
+    /// A real star, from the icon font Dalamud builds on FontAwesome 5 Free solid. An
+    /// asterisk in the default font was tried first and read as nothing at all. The
+    /// same glyph serves both states, gold against dimmed, because the solid set holds
+    /// no hollow star to pair it with.
+    /// </para>
+    /// </summary>
+    private void DrawFavouriteToggle(ShortcutEntry shortcut)
+    {
+        var favourite = shortcut.Favourite;
+
+        ImGui.PushStyleColor(
+            ImGuiCol.Text,
+            favourite
+                ? ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 0.82f, 0.25f, 1f))
+                : ImGui.GetColorU32(ImGuiCol.TextDisabled));
+
+        bool clicked;
+        using (Service.PluginInterface.UiBuilder.IconFontHandle.Push())
+            clicked = ImGui.SmallButton(FontAwesomeIcon.Star.ToIconString());
+
+        ImGui.PopStyleColor();
+
+        if (clicked)
+        {
+            shortcut.Favourite = !favourite;
+            this.config.Save();
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(favourite ? "Remove from favourites" : "Add to favourites");
     }
 
     /// <summary>
@@ -459,7 +619,7 @@ internal sealed class ConfigWindow : Window
     private string SortKey(ShortcutEntry shortcut)
         => this.catalog.FindAvailable(shortcut.InternalName)?.DisplayName ?? shortcut.InternalName;
 
-    private void HandleRowDragAndDrop(int index, string label)
+    private void HandleRowDragAndDrop(int index, string label, ShortcutEntry target)
     {
         if (ImGui.BeginDragDropSource())
         {
@@ -476,7 +636,9 @@ internal sealed class ConfigWindow : Window
             && this.dragSource >= 0
             && this.dragSource != index)
         {
-            this.pendingMove = (this.dragSource, index);
+            // The section comes from the row landed on, so crossing the rule is what
+            // takes a shortcut in and out of the favourites.
+            this.pendingMove = (this.dragSource, index, ShortcutSections.Of(target));
             this.dragSource = -1;
         }
 

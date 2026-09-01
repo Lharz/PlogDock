@@ -26,6 +26,13 @@ that breaks how existing settings behave bumps the major.
 
 ## 0.2.0.0
 
+- Shortcuts can be marked as favourites. The favourites are drawn as their own
+  block at the top of the panel, above a rule and ahead of everything else, so the
+  handful of plugins reached every day keep a place that nothing below them can
+  shift. The settings list is cut into the same two sections, and the order
+  arranged there is the order the panel shows. A shortcut is starred from the
+  button at the end of its row, or dragged across the rule. Nothing starts
+  favourited, so a bar left alone looks exactly as it did.
 - A plugin disabled or uninstalled in Dalamud no longer appears in the bar, nor in
   the settings list. Its tile answered no click, and its row was greyed out to the
   point that it could not even be unticked. The shortcut is kept, so enabling the

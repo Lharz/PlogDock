@@ -169,22 +169,94 @@ internal sealed class BarWindow : Window
         return ImGui.GetItemRectSize().X;
     }
 
+    /// <summary>
+    /// Draws each section as its own grid, one under the other, separated by a rule.
+    /// Nothing here knows what a section stands for: it walks whatever the catalog
+    /// hands it, in the order it is handed.
+    /// </summary>
     private void DrawPanel(float size)
     {
         var columns = Math.Max(1, this.config.Columns);
-        var index = 0;
+        var width = this.PanelWidth(columns, size);
+        var drawn = 0;
 
-        foreach (var (shortcut, entry) in this.catalog.OrderedShortcuts())
+        foreach (var section in ShortcutSections.Order)
         {
-            if (index % columns != 0)
-                ImGui.SameLine();
+            var index = 0;
 
-            this.DrawShortcut(shortcut, entry, size);
-            index++;
+            foreach (var (shortcut, entry) in this.catalog.OrderedShortcuts(section))
+            {
+                // The rule goes in on reaching the first tile of a section rather than
+                // ahead of it, so an empty section leaves none hanging over nothing.
+                if (index == 0)
+                {
+                    if (drawn > 0)
+                        DrawSectionRule(width);
+                }
+                else if (index % columns != 0)
+                {
+                    ImGui.SameLine();
+                }
+
+                this.DrawShortcut(shortcut, entry, size);
+                index++;
+                drawn++;
+            }
         }
 
-        if (index == 0)
+        if (drawn == 0)
             ImGui.TextDisabled("No shortcut enabled.");
+    }
+
+    /// <summary>
+    /// How wide the grid will be, counted from the shortcuts rather than measured. The
+    /// rule between two sections has to span the whole panel, and asking ImGui for that
+    /// width means reading the content region of an auto-resizing window — last frame's
+    /// width feeding this frame's, which is the loop that once sent the toggle sliding
+    /// across the screen.
+    /// </summary>
+    private float PanelWidth(int columns, float size)
+    {
+        var widest = 0;
+
+        foreach (var section in ShortcutSections.Order)
+            widest = Math.Max(widest, Math.Min(this.catalog.CountShortcuts(section), columns));
+
+        if (widest == 0)
+            return 0f;
+
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        return (widest * (size + spacing)) - spacing;
+    }
+
+    /// <summary>
+    /// Separates two sections. The dummy carries the panel width into the group's
+    /// bounding box, so a short favourites row cannot narrow the panel and leave the
+    /// rule running past its edge. The line itself is drawn rather than laid out:
+    /// <c>ImGui.Separator</c> would take its width from the content region, which is
+    /// exactly the measurement this window cannot afford to make.
+    /// </summary>
+    private static void DrawSectionRule(float width)
+    {
+        var spacing = ImGui.GetStyle().ItemSpacing.Y;
+        var origin = ImGui.GetCursorScreenPos();
+
+        // The rule wants more air around it than one tile wants from the next, or the
+        // two sections read as one grid with a line through it. The dummy carries that
+        // air, and the line sits at its centre, so the clearance comes out the same
+        // above and below. Counted in item spacings rather than pixels, to hold at any
+        // interface scale.
+        var height = spacing * 3f;
+
+        ImGui.Dummy(new Vector2(width, height));
+
+        // Snapped to a half pixel, which is where a one pixel line lands sharp.
+        var y = MathF.Floor(origin.Y + (height / 2f)) + 0.5f;
+
+        ImGui.GetWindowDrawList().AddLine(
+            new Vector2(origin.X, y),
+            new Vector2(origin.X + width, y),
+            ImGui.GetColorU32(ImGuiCol.Separator));
     }
 
     /// <summary>

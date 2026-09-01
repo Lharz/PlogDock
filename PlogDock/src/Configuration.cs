@@ -14,6 +14,12 @@ internal sealed class ShortcutEntry
 
     public bool Enabled { get; set; }
 
+    /// <summary>Whether the shortcut belongs to the section pinned at the top of the
+    /// panel. Independent of <see cref="Enabled"/>, and deliberately never reflected in
+    /// the order of <see cref="Configuration.Entries"/>: both views group the list as
+    /// they draw it, so clearing this drops the tile back exactly where it was.</summary>
+    public bool Favourite { get; set; }
+
     /// <summary>Name of a FontAwesome glyph replacing the plugin icon, or null.</summary>
     public string? IconOverride { get; set; }
 
