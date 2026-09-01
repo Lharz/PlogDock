@@ -39,10 +39,20 @@ internal sealed class PluginCatalog
 
     public IReadOnlyCollection<CatalogEntry> Entries => this.entries.Values;
 
-    public CatalogEntry? Find(string internalName)
-        => this.entries.TryGetValue(internalName, out var entry) ? entry : null;
+    /// <summary>
+    /// The entry PlogDock is willing to show for a shortcut: the plugin is installed,
+    /// and Dalamud has it loaded. A plugin disabled or uninstalled answers null here,
+    /// which drops it from the bar and from the settings list alike. The two must
+    /// agree on what is worth showing, so the rule lives in one place.
+    /// <para>
+    /// The shortcut itself is never dropped from the configuration, so enabling the
+    /// plugin again brings it back exactly where it was.
+    /// </para>
+    /// </summary>
+    public CatalogEntry? FindAvailable(string internalName)
+        => this.entries.TryGetValue(internalName, out var entry) && entry.IsLoaded ? entry : null;
 
-    /// <summary>Enabled shortcuts, in configured order, whose plugin is still installed.</summary>
+    /// <summary>Enabled shortcuts, in configured order, whose plugin is available.</summary>
     public IEnumerable<(ShortcutEntry Shortcut, CatalogEntry Catalog)> OrderedShortcuts()
     {
         foreach (var shortcut in this.config.Entries)
@@ -50,8 +60,7 @@ internal sealed class PluginCatalog
             if (!shortcut.Enabled)
                 continue;
 
-            var catalog = this.Find(shortcut.InternalName);
-            if (catalog is not null)
+            if (this.FindAvailable(shortcut.InternalName) is { } catalog)
                 yield return (shortcut, catalog);
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -11,6 +12,11 @@ internal sealed class ConfigWindow : Window
     private readonly Configuration config;
     private readonly PluginCatalog catalog;
     private readonly Launcher launcher;
+
+    /// <summary>The rows to draw this frame, each paired with its index in the
+    /// configuration. Refilled every frame, kept as a field so a hundred plugins do
+    /// not allocate a list per frame for as long as the window stays open.</summary>
+    private readonly List<(int Index, CatalogEntry Entry)> listed = [];
 
     private string search = string.Empty;
 
@@ -162,10 +168,30 @@ internal sealed class ConfigWindow : Window
         ImGui.Spacing();
     }
 
+    /// <summary>
+    /// Collects the rows to draw: the shortcuts whose plugin Dalamud has installed and
+    /// loaded. A plugin disabled or uninstalled is left out entirely rather than shown
+    /// greyed out — its checkbox could not be reached and its tile could not be
+    /// clicked, so listing it only raises the question of why. The shortcut stays in
+    /// the configuration and comes back, in place, when the plugin does.
+    /// </summary>
+    private void CollectListed()
+    {
+        this.listed.Clear();
+
+        for (var i = 0; i < this.config.Entries.Count; i++)
+        {
+            if (this.catalog.FindAvailable(this.config.Entries[i].InternalName) is { } entry)
+                this.listed.Add((i, entry));
+        }
+    }
+
     private void DrawShortcutList()
     {
-        var enabled = this.config.Entries.Count(e => e.Enabled);
-        ImGui.Text($"{enabled} of {this.config.Entries.Count} plugins enabled");
+        this.CollectListed();
+
+        var enabled = this.listed.Count(row => this.config.Entries[row.Index].Enabled);
+        ImGui.Text($"{enabled} of {this.listed.Count} plugins enabled");
 
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##search", "Search...", ref this.search, 128);
@@ -181,40 +207,43 @@ internal sealed class ConfigWindow : Window
             return;
         }
 
-        for (var i = 0; i < this.config.Entries.Count; i++)
+        for (var position = 0; position < this.listed.Count; position++)
         {
-            var shortcut = this.config.Entries[i];
-            var entry = this.catalog.Find(shortcut.InternalName);
-            var label = entry?.DisplayName ?? shortcut.InternalName;
+            var (index, entry) = this.listed[position];
+            var shortcut = this.config.Entries[index];
 
-            if (filtering && label.IndexOf(this.search, StringComparison.OrdinalIgnoreCase) < 0)
+            if (filtering && entry.DisplayName.IndexOf(this.search, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
 
             ImGui.PushID(shortcut.InternalName);
-            this.DrawShortcutRow(i, shortcut, entry, label, filtering);
+            this.DrawShortcutRow(position, index, shortcut, entry, filtering);
             ImGui.PopID();
         }
 
         ImGui.EndChild();
     }
 
+    /// <summary><paramref name="position"/> is the row in the list as drawn,
+    /// <paramref name="index"/> the entry it stands for in the configuration. The two
+    /// part company as soon as a plugin is left out, and both are needed: moving a row
+    /// swaps it with its neighbour on screen, not with whatever entry happens to sit
+    /// next to it in the configuration.</summary>
     private void DrawShortcutRow(
+        int position,
         int index,
         ShortcutEntry shortcut,
-        CatalogEntry? entry,
-        string label,
+        CatalogEntry entry,
         bool filtering)
     {
         // A plugin with nothing to open cannot be enabled: the checkbox would only
         // add a tile that does nothing when clicked.
-        var actionable = entry is not null
-                         && (this.launcher.CanOpenMain(entry) || this.launcher.CanOpenConfig(entry));
+        var actionable = this.launcher.CanOpenMain(entry) || this.launcher.CanOpenConfig(entry);
 
         if (!actionable)
             ImGui.BeginDisabled();
 
         var enabled = shortcut.Enabled;
-        if (ImGui.Checkbox(label, ref enabled))
+        if (ImGui.Checkbox(entry.DisplayName, ref enabled))
         {
             shortcut.Enabled = enabled;
             this.config.Save();
@@ -224,7 +253,7 @@ internal sealed class ConfigWindow : Window
             ImGui.EndDisabled();
 
         if (!filtering)
-            this.HandleRowDragAndDrop(index, label);
+            this.HandleRowDragAndDrop(index, entry.DisplayName);
 
         if (shortcut.IsNew)
         {
@@ -232,12 +261,7 @@ internal sealed class ConfigWindow : Window
             ImGui.TextColored(new Vector4(0.4f, 0.8f, 1f, 1f), "new");
         }
 
-        if (entry is null)
-        {
-            ImGui.SameLine();
-            ImGui.TextDisabled("(not installed)");
-        }
-        else if (!actionable)
+        if (!actionable)
         {
             ImGui.SameLine();
             ImGui.TextDisabled("(nothing to open)");
@@ -250,13 +274,13 @@ internal sealed class ConfigWindow : Window
         // and dragging across a hundred rows means scrolling while holding the mouse.
         ImGui.SameLine(ImGui.GetContentRegionAvail().X - 34f);
 
-        if (ImGui.SmallButton("^") && index > 0)
-            this.pendingMove = (index, index - 1);
+        if (ImGui.SmallButton("^") && position > 0)
+            this.pendingMove = (index, this.listed[position - 1].Index);
 
         ImGui.SameLine();
 
-        if (ImGui.SmallButton("v") && index < this.config.Entries.Count - 1)
-            this.pendingMove = (index, index + 1);
+        if (ImGui.SmallButton("v") && position < this.listed.Count - 1)
+            this.pendingMove = (index, this.listed[position + 1].Index);
     }
 
     private void HandleRowDragAndDrop(int index, string label)

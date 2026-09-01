@@ -311,8 +311,10 @@ internal sealed class BarWindow : Window
         if (ImGui.IsItemHovered())
             DrawTooltip(entry, canMain, canConfig);
 
-        // Inert entries are dimmed rather than hidden, so the grid keeps its shape
-        // and a plugin that failed to load stays where the eye expects it.
+        // A plugin Dalamud has unloaded never gets this far, the catalog drops it.
+        // What is left is a loaded plugin with nothing PlogDock can open, and that one
+        // is dimmed rather than hidden: its shortcut was ticked deliberately, and the
+        // grid keeping its shape reads better than a tile quietly going missing.
         if (!canMain && !canConfig)
         {
             var corner = new Vector2(origin.X + size, origin.Y + size);
@@ -333,11 +335,7 @@ internal sealed class BarWindow : Window
             ImGui.TextDisabled("Right click: settings");
 
         if (!canMain && !canConfig)
-        {
-            ImGui.TextDisabled(entry.IsLoaded
-                ? "Nothing PlogDock can open"
-                : "Plugin is not loaded");
-        }
+            ImGui.TextDisabled("Nothing PlogDock can open");
 
         ImGui.EndTooltip();
     }

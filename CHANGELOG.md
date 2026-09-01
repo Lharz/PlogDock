@@ -26,6 +26,10 @@ that breaks how existing settings behave bumps the major.
 
 ## 0.2.0.0
 
+- A plugin disabled or uninstalled in Dalamud no longer appears in the bar, nor in
+  the settings list. Its tile answered no click, and its row was greyed out to the
+  point that it could not even be unticked. The shortcut is kept, so enabling the
+  plugin again brings it back where it was.
 - New setting, *Enable new plugins automatically*, off by default. Turned on, a
   plugin installed while PlogDock is running gets its shortcut straight away
   rather than waiting to be ticked in the settings. It is still flagged as new
