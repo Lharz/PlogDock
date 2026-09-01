@@ -34,6 +34,12 @@ that breaks how existing settings behave bumps the major.
   plugin installed while PlogDock is running gets its shortcut straight away
   rather than waiting to be ticked in the settings. It is still flagged as new
   either way, so it can be found among a hundred others.
+- Three buttons above the settings list act on every shortcut at once: *Enable
+  all*, *Disable all* and *Sort A-Z*. Each asks for confirmation first, and each
+  works on the whole configuration rather than on whatever the search box is
+  showing. *Enable all* skips the plugins PlogDock has no way of opening, the
+  ones whose checkbox is greyed out. *Sort A-Z* replaces the manual order and
+  cannot be undone.
 
 ## 0.1.0.0
 

@@ -31,6 +31,20 @@ internal sealed class ConfigWindow : Window
 
     private static readonly byte[] DragPayload = [0];
 
+    /// <summary>A change asked of the whole list. Held from the click on the button
+    /// until the confirmation is answered, and read by nothing else in between.</summary>
+    private enum BulkAction
+    {
+        None,
+        EnableAll,
+        DisableAll,
+        Sort,
+    }
+
+    private BulkAction pendingBulk = BulkAction.None;
+
+    private const string ConfirmPopup = "Confirm##PlogDockConfirmBulk";
+
     public ConfigWindow(Configuration config, PluginCatalog catalog, Launcher launcher)
         : base("PlogDock settings##PlogDockConfig")
     {
@@ -62,7 +76,13 @@ internal sealed class ConfigWindow : Window
         this.DrawSettings();
         ImGui.Separator();
         this.DrawShortcutList();
+        this.DrawBulkConfirmation();
 
+        this.ApplyPendingMove();
+    }
+
+    private void ApplyPendingMove()
+    {
         if (this.pendingMove is not { } move)
             return;
 
@@ -193,6 +213,8 @@ internal sealed class ConfigWindow : Window
         var enabled = this.listed.Count(row => this.config.Entries[row.Index].Enabled);
         ImGui.Text($"{enabled} of {this.listed.Count} plugins enabled");
 
+        this.DrawBulkActions();
+
         ImGui.SetNextItemWidth(-1f);
         ImGui.InputTextWithHint("##search", "Search...", ref this.search, 128);
 
@@ -282,6 +304,151 @@ internal sealed class ConfigWindow : Window
         if (ImGui.SmallButton("v") && position < this.listed.Count - 1)
             this.pendingMove = (index, this.listed[position + 1].Index);
     }
+
+    /// <summary>
+    /// The three list-wide actions. They always act on the whole configuration, never
+    /// on what the search box happens to be showing: a button whose reach depends on
+    /// the contents of a text field elsewhere is a trap.
+    /// </summary>
+    private void DrawBulkActions()
+    {
+        if (ImGui.Button("Enable all"))
+            this.Ask(BulkAction.EnableAll);
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Disable all"))
+            this.Ask(BulkAction.DisableAll);
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Sort A-Z"))
+            this.Ask(BulkAction.Sort);
+    }
+
+    private void Ask(BulkAction action)
+    {
+        this.pendingBulk = action;
+        ImGui.OpenPopup(ConfirmPopup);
+    }
+
+    /// <summary>
+    /// One modal serves all three actions. Drawn after the list rather than beside the
+    /// buttons, so that confirming mutates the entries once the row loop has finished
+    /// reading them.
+    /// </summary>
+    private void DrawBulkConfirmation()
+    {
+        if (this.pendingBulk == BulkAction.None)
+            return;
+
+        if (!ImGui.BeginPopupModal(ConfirmPopup, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            // Escape closed it. ImGui dismisses a modal without telling the caller,
+            // so the pending action has to be dropped here or it outlives its popup.
+            this.pendingBulk = BulkAction.None;
+            return;
+        }
+
+        ImGui.TextWrapped(Prompt(this.pendingBulk));
+        ImGui.Spacing();
+
+        var button = new Vector2(120f, 0f);
+
+        if (ImGui.Button("Confirm", button))
+        {
+            this.Apply(this.pendingBulk);
+            this.pendingBulk = BulkAction.None;
+            ImGui.CloseCurrentPopup();
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Cancel", button))
+        {
+            this.pendingBulk = BulkAction.None;
+            ImGui.CloseCurrentPopup();
+        }
+
+        // Focus lands on Cancel: none of the three actions can be undone.
+        ImGui.SetItemDefaultFocus();
+
+        ImGui.EndPopup();
+    }
+
+    private static string Prompt(BulkAction action) => action switch
+    {
+        BulkAction.EnableAll => "Give every plugin PlogDock can open a shortcut in the bar?",
+        BulkAction.DisableAll => "Remove every shortcut from the bar? The plugins themselves are left alone.",
+        BulkAction.Sort => "Sort every shortcut by name? This replaces your manual order, and cannot be undone.",
+        _ => string.Empty,
+    };
+
+    private void Apply(BulkAction action)
+    {
+        switch (action)
+        {
+            case BulkAction.EnableAll:
+                this.EnableAll();
+                break;
+
+            case BulkAction.DisableAll:
+                // Including the shortcuts whose plugin is currently absent. Sparing
+                // them would have a reinstalled plugin light up in a bar emptied on
+                // purpose.
+                foreach (var shortcut in this.config.Entries)
+                    shortcut.Enabled = false;
+
+                break;
+
+            case BulkAction.Sort:
+                this.SortAlphabetically();
+                break;
+
+            default:
+                return;
+        }
+
+        this.config.Save();
+    }
+
+    /// <summary>Ticks every shortcut PlogDock could actually open, and only those: a
+    /// plugin whose own checkbox is greyed out would gain nothing but an inert
+    /// tile.</summary>
+    private void EnableAll()
+    {
+        foreach (var shortcut in this.config.Entries)
+        {
+            if (this.catalog.FindAvailable(shortcut.InternalName) is not { } entry)
+                continue;
+
+            if (this.launcher.CanOpenMain(entry) || this.launcher.CanOpenConfig(entry))
+                shortcut.Enabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Orders the whole configuration, the shortcuts whose plugin is currently absent
+    /// included. Those are invisible here, and leaving them in place would drop a
+    /// reinstalled plugin into the middle of an otherwise sorted list. They have no
+    /// display name to sort on, so their internal name stands in.
+    /// <para>
+    /// The list is rewritten in place rather than replaced, so that nothing holding a
+    /// reference to it is left reading the old one.
+    /// </para>
+    /// </summary>
+    private void SortAlphabetically()
+    {
+        var sorted = this.config.Entries
+            .OrderBy(this.SortKey, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        this.config.Entries.Clear();
+        this.config.Entries.AddRange(sorted);
+    }
+
+    private string SortKey(ShortcutEntry shortcut)
+        => this.catalog.FindAvailable(shortcut.InternalName)?.DisplayName ?? shortcut.InternalName;
 
     private void HandleRowDragAndDrop(int index, string label)
     {
