@@ -393,28 +393,47 @@ internal sealed class ConfigWindow : Window
         //
         // The star stays reachable while searching. Finding one plugin among a hundred
         // and starring it on the spot is exactly what the search box is for.
-        // The star stays reachable while searching. Finding one plugin among a hundred
-        // and starring it on the spot is exactly what the search box is for.
         ImGui.SameLine(ImGui.GetContentRegionMax().X - this.trailingWidth);
-        this.DrawFavouriteToggle(shortcut);
+        this.DrawRowControls(position, index, shortcut, filtering, first, last);
+    }
 
-        if (filtering)
-            return;
+    /// <summary>
+    /// The buttons at the end of a row, drawn in the icon font under a single push:
+    /// the font stack and the colour stack are independent, so the star still takes
+    /// its own tint inside it.
+    /// </summary>
+    private void DrawRowControls(
+        int position,
+        int index,
+        ShortcutEntry shortcut,
+        bool filtering,
+        bool first,
+        bool last)
+    {
+        using (Service.PluginInterface.UiBuilder.IconFontHandle.Push())
+        {
+            this.DrawFavouriteToggle(shortcut);
 
-        var section = this.listed[position].Section;
+            // The star stays reachable while searching. Finding one plugin among a
+            // hundred and starring it on the spot is what the search box is for.
+            if (filtering)
+                return;
 
-        // Kept alongside the drag: one notch at a time is easier to aim than a drag,
-        // and dragging across a hundred rows means scrolling while holding the mouse.
-        // Neither notch leaves the section.
-        ImGui.SameLine();
+            var section = this.listed[position].Section;
 
-        if (ImGui.SmallButton("^") && !first)
-            this.pendingMove = (index, this.listed[position - 1].Index, section);
+            // Kept alongside the drag: one notch at a time is easier to aim than a
+            // drag, and dragging across a hundred rows means scrolling while holding
+            // the mouse. Neither notch leaves the section.
+            ImGui.SameLine();
 
-        ImGui.SameLine();
+            if (ImGui.SmallButton(FontAwesomeIcon.ArrowUp.ToIconString()) && !first)
+                this.pendingMove = (index, this.listed[position - 1].Index, section);
 
-        if (ImGui.SmallButton("v") && !last)
-            this.pendingMove = (index, this.listed[position + 1].Index, section);
+            ImGui.SameLine();
+
+            if (ImGui.SmallButton(FontAwesomeIcon.ArrowDown.ToIconString()) && !last)
+                this.pendingMove = (index, this.listed[position + 1].Index, section);
+        }
     }
 
     /// <summary>How much room the buttons at the end of a row need. The notches are
@@ -424,16 +443,17 @@ internal sealed class ConfigWindow : Window
         var padding = ImGui.GetStyle().FramePadding.X * 2f;
         var spacing = ImGui.GetStyle().ItemSpacing.X;
 
-        float star;
         using (Service.PluginInterface.UiBuilder.IconFontHandle.Push())
-            star = ImGui.CalcTextSize(FontAwesomeIcon.Star.ToIconString()).X + padding;
+        {
+            var star = ImGui.CalcTextSize(FontAwesomeIcon.Star.ToIconString()).X + padding;
 
-        if (filtering)
-            return star;
+            if (filtering)
+                return star;
 
-        return star
-               + spacing + ImGui.CalcTextSize("^").X + padding
-               + spacing + ImGui.CalcTextSize("v").X + padding;
+            return star
+                   + spacing + ImGui.CalcTextSize(FontAwesomeIcon.ArrowUp.ToIconString()).X + padding
+                   + spacing + ImGui.CalcTextSize(FontAwesomeIcon.ArrowDown.ToIconString()).X + padding;
+        }
     }
 
     /// <summary>

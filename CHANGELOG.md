@@ -33,6 +33,8 @@ that breaks how existing settings behave bumps the major.
   arranged there is the order the panel shows. A shortcut is starred from the
   button at the end of its row, or dragged across the rule. Nothing starts
   favourited, so a bar left alone looks exactly as it did.
+- The two reorder buttons in the settings list are drawn as arrows. A caret and a
+  lowercase v read as punctuation rather than as something to click.
 - A plugin disabled or uninstalled in Dalamud no longer appears in the bar, nor in
   the settings list. Its tile answered no click, and its row was greyed out to the
   point that it could not even be unticked. The shortcut is kept, so enabling the
