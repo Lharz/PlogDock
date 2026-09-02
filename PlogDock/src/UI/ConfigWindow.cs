@@ -455,9 +455,11 @@ internal sealed class ConfigWindow : Window
     }
 
     /// <summary>
-    /// The buttons at the end of a row, drawn in the icon font under a single push:
-    /// the font stack and the colour stack are independent, so the star still takes
-    /// its own tint inside it.
+    /// The buttons at the end of a row. The notches share one push of the icon font;
+    /// the star opens its own, around its glyph alone. Wrapping the star in the push
+    /// out here instead looked like the tidier arrangement and left its tooltip inside
+    /// the icon font, where every letter of it came out as a missing glyph: FontAwesome
+    /// carries no ASCII. Nothing but a glyph belongs inside one of these.
     /// </summary>
     private void DrawRowControls(
         int position,
@@ -467,22 +469,22 @@ internal sealed class ConfigWindow : Window
         bool first,
         bool last)
     {
+        this.DrawFavouriteToggle(shortcut);
+
+        // The star stays reachable while searching. Finding one plugin among a
+        // hundred and starring it on the spot is what the search box is for.
+        if (filtering)
+            return;
+
+        var section = this.listed[position].Section;
+
+        // Kept alongside the drag: one notch at a time is easier to aim than a
+        // drag, and dragging across a hundred rows means scrolling while holding
+        // the mouse. Neither notch leaves the section.
+        ImGui.SameLine();
+
         using (Service.PluginInterface.UiBuilder.IconFontHandle.Push())
         {
-            this.DrawFavouriteToggle(shortcut);
-
-            // The star stays reachable while searching. Finding one plugin among a
-            // hundred and starring it on the spot is what the search box is for.
-            if (filtering)
-                return;
-
-            var section = this.listed[position].Section;
-
-            // Kept alongside the drag: one notch at a time is easier to aim than a
-            // drag, and dragging across a hundred rows means scrolling while holding
-            // the mouse. Neither notch leaves the section.
-            ImGui.SameLine();
-
             if (ImGui.SmallButton(FontAwesomeIcon.ArrowUp.ToIconString()) && !first)
                 this.pendingMove = (index, this.listed[position - 1].Index, section);
 
@@ -547,6 +549,8 @@ internal sealed class ConfigWindow : Window
             this.config.Save();
         }
 
+        // Outside the push above, and the caller keeps its own off this method: text
+        // drawn in the icon font is a row of tofu.
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(favourite ? "Remove from favourites" : "Add to favourites");
     }
